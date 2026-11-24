@@ -1,5 +1,5 @@
 ﻿<#
-  Ab1BaS NetCheck v1.0
+  Ab1BaS NetCheck v1.1
   Диагностика сети для онлайн-игр.
 
   Скрипт ТОЛЬКО ЧИТАЕТ данные и ничего не меняет в системе.
@@ -29,7 +29,7 @@ param([int]$Seconds = 300)
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
-$Version = '1.0'
+$Version = '1.1'
 
 function Hide-Mac([string]$s) {
     if (-not $s) { return $s }
@@ -122,8 +122,11 @@ if ($hx.Count -ge 2) { $wifiPower = "от сети: $($pwNames[$hx[0]]), от б
 $wifiInfo = ''
 if ($isWifi) {
     $wl = netsh wlan show interfaces 2>$null
-    $wifiInfo = (@($wl | Where-Object { $_ -match ':' -and $_ -notmatch 'SSID|Profile|Профиль|Профіль|Physical address|Физический адрес|Фізична адреса|GUID' } |
-        ForEach-Object { Hide-Mac (($_.Trim()) -replace '\s{2,}', ' ') } | Select-Object -First 22) -join '; ')
+    if (($wl | Out-String) -match 'privacy-location|WlanQueryInterface|error 5|ошибка 5') { $wifiInfo = 'Windows не дает данные Wi-Fi без разрешения на геолокацию (это необязательно, остальная диагностика работает)' }
+    else {
+        $wifiInfo = (@($wl | Where-Object { $_ -match ':' -and $_ -notmatch 'SSID|Profile|Профиль|Профіль|Physical address|Физический адрес|Фізична адреса|GUID' } |
+            ForEach-Object { Hide-Mac (($_.Trim()) -replace '\s{2,}', ' ') } | Select-Object -First 22) -join '; ')
+    }
 }
 
 $advInfo = (@(Get-NetAdapterAdvancedProperty -Name $ad.Name |
@@ -220,7 +223,8 @@ Remove-Job $job -Force
 $hops = @()
 foreach ($line in $pp) {
     if ([string]$line -match '^\s*(\d+)\s+(\S+)\s+\d+/\s*\d+\s*=\s*(\d+)%\s+\d+/\s*\d+\s*=\s*(\d+)%\s+(\S+)') {
-        $hops += "$($Matches[1]): $($Matches[2]) потери до узла $($Matches[3])%, на узле $($Matches[4])% ($($Matches[5]))"
+        if ($Matches[2] -match '^-+$') { $hops += "$($Matches[1]): узел не отвечает на пинг, это нормально ($($Matches[5]))" }
+        else { $hops += "$($Matches[1]): $($Matches[2]) потери до узла $($Matches[3])%, на узле $($Matches[4])% ($($Matches[5]))" }
     }
 }
 $hopsLine = if ($hops.Count) { $hops -join ' | ' } else { 'не удалось получить' }
